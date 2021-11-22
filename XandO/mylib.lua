@@ -18,6 +18,13 @@ mylib.rc2k = function (row, col)
    return (row - 1) * 3 + (col - 1) + 1     
 end
 
+mylib.k2rc3 = function (k)
+   local row = 1 + math.floor((k-1)/9)
+   local col = 1 + (k - 1) % 9
+
+   return row, col
+end
+
 
 -----------------------------------------------------------------------------------------
 -- logic functions
@@ -72,6 +79,38 @@ local function isTie(board)
 end
 mylib.isTie = isTie
 
+local function calcSubBoard(subBoards, k)
+   local subBoard = {}
+   local magicNumbers = {1,4,7,28,31,34,55,58,61} --Top left position of each sub board
+   for _,x in ipairs(magicNumbers) do
+      if (x <= k and k < x + 3) or (x + 9 <= k and k < x + 12) or (x + 18 <= k and k < x + 21) then
+         for z = 0, 2 do
+            for y = 0, 2 do
+               subBoard[#subBoard+1] = subBoards[x + y + (9 * z)]
+            end
+         end
+         break
+      end
+   end
+   return subBoard
+end
+mylib.calcSubBoard = calcSubBoard
 
+local function isSubWin(subBoards, k)
+   local subBoard = calcSubBoard(subBoards, k)
+   return isRowWin(subBoard) > 0 or isColWin(subBoard) > 0 or isDiagonalWin(subBoard) or isAntiDiagonalWin(subBoard)
+end
+mylib.isSubWin = isSubWin
+
+local function isSubTie(subBoards, k)
+   local subBoard = calcSubBoard(subBoards, k)
+   for x = 1, 9 do
+      if subBoard[x] == 0 then
+         return false
+      end
+   end
+   return true
+end
+mylib.isSubTie = isSubTie
 
 return mylib
