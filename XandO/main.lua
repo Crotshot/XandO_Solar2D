@@ -20,6 +20,7 @@ local board = {} -- logic representation of game board
 local mainSquares = {} -- game board buttons to deal with UI
 
 local subBoards = {}
+local subBoard = {}
 local subSquares = {}
 local lastSubMove = nil
 
