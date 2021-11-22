@@ -6,7 +6,7 @@ local mylib = require("mylib")
 WON = 100
 
 -- visible to game so that it modified by user
-ai.maxDepth = 2
+ai.maxDepth = 3
 
 -- compute a score for current game state
 function ai.eval(board)
@@ -22,7 +22,7 @@ function ai.search(board, players, player, depth)
     local indent = string.rep("  ", depth)
 
     local bestMove = 0
-    local bestScore = 0
+    local bestScore = -math.huge
 
     if debug then print(indent .. "SEARCHING at depth ".. depth .." as PLAYER ".. players[player].name) end
     -- check if win
@@ -43,7 +43,7 @@ function ai.search(board, players, player, depth)
         -- place piece
         if board[k] == 0 then
             -- get score from recursive call to ai.search, switching players
-            board[k] = player
+            board[k] = players[player].value
             local score, _ = ai.search(board, players, players[player%2+1].value,depth + 1)
             board[k] = 0-- remove piece
             -- if score better than found to date update best score and best move
