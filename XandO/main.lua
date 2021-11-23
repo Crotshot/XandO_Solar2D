@@ -20,13 +20,13 @@ local board = {} -- logic representation of game board
 local mainSquares = {} -- game board buttons to deal with UI
 
 local subBoards = {}
-local subBoard = {}
 local subSquares = {}
-local lastSubMove = nil
+local boardLocks = {}
+local activeBoard = {}
 
 local players = {
     {name="X", human=true, value=1, wins=0},
-    {name="O", human=true, value=-1, wins=0},
+    {name="O", human=false, value=-1, wins=0},
 }
 local player = 1
 local gameCount = 0
@@ -110,8 +110,10 @@ local function nextPlayer(value)
     state = players[player].human and 'waiting' or 'thinking'
 
     if state == 'thinking' then
-        local result = ai.move(board, players, player)
-        move(result)
+        -- local result = ai.move(board, players, player)
+        -- move(result)
+        local result = ai.subMove(board, players, player)
+        subMove(result)
     end
 end
 
@@ -127,13 +129,17 @@ move = function(k)
     square.symbol = symbol
     board[k] = players[player].value
 
+    local boardFull = true
+    for i = 1, #boardLocks do
+        if boardLocks[i] == false then  boardFull = false break end
+    end
     if mylib.isWin(board) then
         state = "over"
         gameCount = gameCount + 1
         players[player].wins = players[player].wins + 1
         displayMessage("Player "..players[player].name.." Wins")
         audio.play( winSound, { channel=3} )
-    elseif mylib.isTie(board) then
+    elseif mylib.isTie(board) or boardFull then
         state = "over"
         gameCount = gameCount + 1
         displayMessage("Game Tied")
@@ -142,37 +148,8 @@ move = function(k)
     end
 end
 
-subMove = function(k)
-    -- get square linked to current event
-    local square = subSquares[k]
-
-    local filename = "assets/images/"..players[player].name..".png"
-    local symbol = display.newImageRect(mainGroup, filename, (size/3)-1*gap, (size/3)-1*gap)
-    symbol.x = square.rect.x
-    symbol.y = square.rect.y
-    square.symbol = symbol
-    subBoards[k] = players[player].value
-
-    if mylib.isSubWin(subBoards, k) then --Magic Numbers -> {1, 4, 7, 28, 31, 34, 55, 58, 61} if x =< & < x + 3 or x + 9 =< & < x + 11 or x + 18 <= & < x + 21
-        print("Winner winner")
-        -- state = "over"
-        -- gameCount = gameCount + 1
-        -- players[player].wins = players[player].wins + 1
-        -- displayMessage("Player "..players[player].name.." Wins")
-        -- audio.play( winSound, { channel=3} )
-    elseif mylib.isSubTie(subBoards, k) then
-        print("A tie tie")
-        -- state = "over"
-        -- gameCount = gameCount + 1
-        -- displayMessage("Game Tied")
-    else
-        nextPlayer()
-    end
-end
-
 checkMove = function(event)
-
-    print(players[player].name .."'s move at square " .. event.target.k)
+    -- print(players[player].name .."'s move at square " .. event.target.k)
     -- return if current square is not-empty
     if board[event.target.k] ~= 0 then
         print("\t cannot move to non-empty square")
@@ -192,11 +169,66 @@ checkMove = function(event)
 
 end
 
-checkSubMove = function(event)
 
+subMove = function(k)
+    -- get square linked to current event
+    local grid, box = mylib.k2rc3(k)
+    local sub = subSquares[grid]
+    local sq = sub[box]
+
+    local filename = "assets/images/"..players[player].name..".png"
+    local symbol = display.newImageRect(mainGroup, filename, (size/3)-1*gap, (size/3)-1*gap)
+    symbol.x = sq.rect.x
+    symbol.y = sq.rect.y
+    sq.symbol = symbol
+
+    subBoards[grid][box] = players[player].value
+
+    local row,col = mylib.k2rc(box)
+    local x = display.contentCenterX + (col-4/2)*size
+    local y = display.contentCenterY + (row-4/2)*size
+    activeBoard.rect.x = x
+    activeBoard.rect.y = y
+    activeBoard.value = box;
+    if mylib.isSubWin(subBoards[grid]) then --Magic Numbers -> {1, 4, 7, 28, 31, 34, 55, 58, 61} if x =< & < x + 3 or x + 9 =< & < x + 11 or x + 18 <= & < x + 21
+        print("Winner winner")
+        boardLocks[grid] = true
+        move(grid)
+        -- state = "over"
+        -- gameCount = gameCount + 1
+        -- players[player].wins = players[player].wins + 1
+        -- displayMessage("Player "..players[player].name.." Wins")
+        -- audio.play( winSound, { channel=3} )
+    elseif mylib.isSubTie(subBoards[grid]) then
+        print("A tie tie")
+        boardLocks[grid] = true;
+        -- state = "over"
+        -- gameCount = gameCount + 1
+        -- displayMessage("Game Tied")
+    else
+        nextPlayer()
+    end
+    if boardLocks[box] then 
+        activeBoard.value = -1
+    end
+end
+
+checkSubMove = function(event)
     print(players[player].name .."'s sub move at sub square " .. event.target.k)
     -- return if current square is not-empty
-    if subBoards[event.target.k] ~= 0 then
+
+    local grid, box = mylib.k2rc3(event.target.k)
+
+    if grid ~= activeBoard.value and activeBoard.value ~= -1 then
+        print("\t this is the wrong board, use board " .. activeBoard.value)
+        return false;
+    end
+    if boardLocks[grid] then
+        print("\t sub board is complete, try a different board")
+        return false;
+    end
+    local subBoard = subBoards[grid]
+    if subBoard[box] ~= 0 then
         print("\t cannot move to non-empty square")
         return false
     end
@@ -211,7 +243,6 @@ checkSubMove = function(event)
 
     -- place valid move
     subMove(event.target.k)
-
 end
 
 
@@ -222,6 +253,13 @@ resetBoard = function()
         for _,square in ipairs(mainSquares) do
             display.remove(square.symbol)
             square.symbol = nil
+        end
+
+        for _,subSquare in ipairs(subSquares) do
+            for _,square in ipairs(subSquare) do
+                display.remove(square.symbol)
+                square.symbol = nil
+            end
         end
     end
 
@@ -235,15 +273,23 @@ resetBoard = function()
         board[k] = 0
     end
     subBoards = {}
-    for k = 1, 81 do
-        subBoards[k] = 0
+    for k = 1, 9 do
+        local subBoard = {}
+        for v = 1, 9 do
+            subBoard[v] = 0
+        end
+        subBoards[k] = subBoard
+        boardLocks[k] = false
     end
+
+    activeBoard.rect.x = display.contentCenterX + (2-4/2)*size
+    activeBoard.rect.y = display.contentCenterY + (2-4/2)*size
+
     nextPlayer(1)
 end
 
 
 local function createBoard()
-
     --Sub board lines
     for x = 1, 8 do
         drawLine(-1.5 + (x * 0.333),-3/2,-1.5 + (x * 0.333),3/2, "gray", 3)
@@ -253,10 +299,10 @@ local function createBoard()
     end
 
     --Big board lines
-    drawLine(-1/2, -3/2, -1/2,  3/2)
-    drawLine( 1/2, -3/2,  1/2,  3/2)
-    drawLine(-3/2, -1/2,  3/2, -1/2)
-    drawLine(-3/2,  1/2,  3/2,  1/2)
+    drawLine(-1/2, -3/2, -1/2,  3/2,"black", 4)
+    drawLine( 1/2, -3/2,  1/2,  3/2,"black", 4)
+    drawLine(-3/2, -1/2,  3/2, -1/2,"black", 4)
+    drawLine(-3/2,  1/2,  3/2,  1/2,"black", 4)
 
     mainSquares = {}
     for k = 1, 9 do
@@ -270,16 +316,51 @@ local function createBoard()
         mainSquares[k] = {value=0, rect=rect}
     end
 
+    local x = display.contentCenterX + (2-4/2)*size
+    local y = display.contentCenterY + (2-4/2)*size
+    local rect = display.newRect( uiGroup, x, y, size - gap, size - gap)
+    rect.alpha = 0.25
+    activeBoard = {value=5, rect = rect}
+    -- subSquares = {}
+    -- for k = 1, 81 do
+    --     local row, col = mylib.k2rc3(k)
+    --     local x = display.contentCenterX + (col-10/2)*(size/3)
+    --     local y = display.contentCenterY + (row-10/2)*(size/3)
+    --     local rect = display.newRect( uiGroup, x, y, size/3 - gap, size/3 - gap)
+    --     rect.k = k
+    --     rect.alpha = 0.3
+    --     rect:addEventListener( "tap", checkSubMove )
+    --     subSquares[k] = {value=0, rect=rect}
+    -- end
+
     subSquares = {}
-    for k = 1, 81 do
-        local row, col = mylib.k2rc3(k)
-        local x = display.contentCenterX + (col-10/2)*(size/3)
-        local y = display.contentCenterY + (row-10/2)*(size/3)
-        local rect = display.newRect( uiGroup, x, y, size/3 - gap, size/3 - gap)
-        rect.k = k
-        rect.alpha = 0.3
-        rect:addEventListener( "tap", checkSubMove )
-        subSquares[k] = {value=0, rect=rect}
+    for gy = 0, 2 do
+        for gx = 1, 3 do
+            local subSquare = {}
+            for y = 0, 2 do
+                for x = 1, 3 do
+                    local row = gy * 3 + (y+1)
+                    local col = (gx-1) * 3 + x
+
+                    local px = display.contentCenterX + (col-10/2)*(size/3)
+                    local py = display.contentCenterY + (row-10/2)*(size/3)
+
+                    local rect = display.newRect( uiGroup, px, py, size/3 - gap, size/3 - gap)
+                    rect.k = ((gy * 3 + gx)-1) * 9 + (y * 3 + x)
+                    rect.alpha = 0.3
+                    rect:addEventListener( "tap", checkSubMove )
+
+                    subSquare[y * 3 + x] = {value=0, rect=rect}
+
+                    -- local subSquare = {}
+                    -- subSquare[y * 3 + x].value = 0
+                    -- subSquare[y * 3 + x].rect = rect
+
+                    --print("subSquares[gy * 3 + gx] ->" .. gy * 3 + gx .. ",  subSquare[y * 3 + x] ->" .. y * 3 + x)
+                end
+            end
+            subSquares[gy * 3 + gx] = subSquare
+        end
     end
 
     turnText = display.newText( mainGroup, "", 0, 0, "assets/fonts/Bangers.ttf", 24)

@@ -15,16 +15,17 @@ mylib.k2rc = function (k)
 end
 
 mylib.rc2k = function (row, col)
-   return (row - 1) * 3 + (col - 1) + 1     
+   return (row - 1) * 3 + (col - 1) + 1
 end
 
 mylib.k2rc3 = function (k)
-   local row = 1 + math.floor((k-1)/9)
-   local col = 1 + (k - 1) % 9
-
-   return row, col
+   local gridIndex  = math.ceil((k / 9))
+   local boxIndex = k % 9
+   if boxIndex == 0 then boxIndex = 9 end
+   return gridIndex, boxIndex
 end
 
+--rect.k = ((gy * 3 + gx)-1) * 9 + (y * 3 + x)
 
 -----------------------------------------------------------------------------------------
 -- logic functions
@@ -50,6 +51,7 @@ local function isColWin(board)
    return 0
 end
 mylib.isColWin = isColWin
+
 
 local function isDiagonalWin(board)
    return board[1] ~= 0 and board[1] == board[5] and board[5] == board[9]
@@ -79,6 +81,7 @@ local function isTie(board)
 end
 mylib.isTie = isTie
 
+
 local function calcSubBoard(subBoards, k)
    local subBoard = {}
    local magicNumbers = {1,4,7,28,31,34,55,58,61} --Top left position of each sub board
@@ -96,16 +99,16 @@ local function calcSubBoard(subBoards, k)
 end
 mylib.calcSubBoard = calcSubBoard
 
-local function isSubWin(subBoards, k)
-   local subBoard = calcSubBoard(subBoards, k)
-   return isRowWin(subBoard) > 0 or isColWin(subBoard) > 0 or isDiagonalWin(subBoard) or isAntiDiagonalWin(subBoard)
+
+local function isSubWin(grid)
+   return isRowWin(grid) > 0 or isColWin(grid) > 0 or isDiagonalWin(grid) or isAntiDiagonalWin(grid)
 end
 mylib.isSubWin = isSubWin
 
-local function isSubTie(subBoards, k)
-   local subBoard = calcSubBoard(subBoards, k)
+
+local function isSubTie(grid)
    for x = 1, 9 do
-      if subBoard[x] == 0 then
+      if grid[x] == 0 then
          return false
       end
    end
