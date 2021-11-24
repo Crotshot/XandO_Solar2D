@@ -110,9 +110,7 @@ local function nextPlayer(value)
     state = players[player].human and 'waiting' or 'thinking'
 
     if state == 'thinking' then
-        -- local result = ai.move(board, players, player)
-        -- move(result)
-        local result = ai.subMove(board, players, player)
+        local result = ai.move(board, subBoards, players, player, 1, activeBoard.value, boardLocks)
         subMove(result)
     end
 end
@@ -190,6 +188,11 @@ subMove = function(k)
     activeBoard.rect.x = x
     activeBoard.rect.y = y
     activeBoard.value = box;
+
+    if boardLocks[box] then
+        activeBoard.value = -1
+    end
+
     if mylib.isSubWin(subBoards[grid]) then --Magic Numbers -> {1, 4, 7, 28, 31, 34, 55, 58, 61} if x =< & < x + 3 or x + 9 =< & < x + 11 or x + 18 <= & < x + 21
         print("Winner winner")
         boardLocks[grid] = true
@@ -207,9 +210,6 @@ subMove = function(k)
         -- displayMessage("Game Tied")
     else
         nextPlayer()
-    end
-    if boardLocks[box] then 
-        activeBoard.value = -1
     end
 end
 
